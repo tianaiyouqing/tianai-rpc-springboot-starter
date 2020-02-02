@@ -1,0 +1,1 @@
+这是对TIANAI-RPC 框架的springboot脚手架工具，方便配置启动
