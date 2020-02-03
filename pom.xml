@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>cloud.tianai.rpc</groupId>
     <artifactId>tianai-rpc-springboot-starter</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.2.1</version>
 
     <name>${project.artifactId}</name>
     <description>tianai-rpc by tianaiyouqing</description>
