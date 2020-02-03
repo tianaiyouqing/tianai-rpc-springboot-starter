@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>cloud.tianai.rpc</groupId>
     <artifactId>tianai-rpc-springboot-starter</artifactId>
-    <version>1.0.2.1</version>
+    <version>1.0.3</version>
 
     <name>${project.artifactId}</name>
     <description>tianai-rpc by tianaiyouqing</description>
@@ -122,7 +122,7 @@
                     <configuration>
                         <serverId>ossrh</serverId>
                         <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                        <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                        <autoReleaseAfterClose>true</autoReleaseAfterClose>
                     </configuration>
                 </plugin>
                 <plugin>
