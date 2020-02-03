@@ -15,8 +15,8 @@ public class RpcAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties) {
-        return new AnnotationBeanProcessor(rpcConsumerProperties);
+    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties) {
+        return new AnnotationBeanProcessor(rpcConsumerProperties, rpcProperties);
     }
 
     @Bean()
@@ -25,7 +25,7 @@ public class RpcAutoConfiguration {
         ServerBootstrap serverBootstrap = new ServerBootstrap();
         serverBootstrap.codec(rpcProperties.getCodec())
                 .timeout(rpcProviderProperties.getTimeout())
-                .registry(new URL(rpcProperties.getRegistry(), rpcProperties.getRegistryHost(), rpcProperties.getRegistryPort()))
+                .registry(new URL(rpcProperties.getRegistry(), rpcProperties.getRegistryAddress(), 0))
                 .server(rpcProviderProperties.getServer())
                 .port(rpcProviderProperties.getPort());
         serverBootstrap.start();

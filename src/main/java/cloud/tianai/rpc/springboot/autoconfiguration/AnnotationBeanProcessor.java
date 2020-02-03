@@ -30,13 +30,15 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, BeanFactoryPo
 
     private Properties prop;
     private RpcConsumerProperties rpcConsumerProperties;
+    private RpcProperties rpcProperties;
     private AbstractApplicationContext applicationContext;
 
     private Map<Object, RpcProvider> rpcProviderMap = new ConcurrentHashMap<Object, RpcProvider>(16);
     private ConfigurableListableBeanFactory beanFactory;
 
-    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties) {
+    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties) {
         this.rpcConsumerProperties = rpcConsumerProperties;
+        this.rpcProperties = rpcProperties;
     }
 
     @Override
@@ -101,13 +103,12 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, BeanFactoryPo
         if (rpcConsumerProperties == null) {
             throw new RpcException("TIANAI-RPC 读取公共客户端消息失败， 未配置 [RpcConsumerProperties]");
         }
-        properties.setProperty(RpcClientConfigConstant.CODEC, rpcConsumerProperties.getCodec());
-        properties.setProperty(RpcClientConfigConstant.REGISTER, rpcConsumerProperties.getRegister());
-        properties.setProperty(RpcClientConfigConstant.REGISTRY_HOST, rpcConsumerProperties.getRegisterHost());
-        properties.setProperty(RpcClientConfigConstant.REGISTRY_PORT, String.valueOf(rpcConsumerProperties.getRegisterPort()));
+        properties.setProperty(RpcClientConfigConstant.CODEC, rpcProperties.getCodec());
+        properties.setProperty(RpcClientConfigConstant.REGISTER, rpcProperties.getRegistry());
+        properties.setProperty(RpcClientConfigConstant.REGISTRY_HOST, rpcProperties.getRegistryAddress());
+        properties.setProperty(RpcClientConfigConstant.REGISTRY_PORT, String.valueOf(0));
         properties.setProperty(RpcClientConfigConstant.PROTOCOL, String.valueOf(rpcConsumerProperties.getClient()));
-        properties.setProperty(RpcClientConfigConstant.WORKER_THREADS, String.valueOf(rpcConsumerProperties.getWorkerThreads()));
-
+        properties.setProperty(RpcClientConfigConstant.WORKER_THREADS, String.valueOf(rpcProperties.getWorkerThreads()));
         return properties;
     }
 

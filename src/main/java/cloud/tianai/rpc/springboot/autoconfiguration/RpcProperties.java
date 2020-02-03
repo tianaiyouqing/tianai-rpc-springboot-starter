@@ -10,7 +10,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class RpcProperties {
     private String codec = "hessian2";
     private String registry = "zookeeper";
-    private String registryHost = IPUtils.getHostIp();
-    private Integer registryPort = 2181;
+    private String registryAddress = "127.0.0.1:2181";
     private Integer workerThreads = RpcConfigConstant.DEFAULT_IO_THREADS;
 }
