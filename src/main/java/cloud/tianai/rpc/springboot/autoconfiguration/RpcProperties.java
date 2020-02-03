@@ -8,6 +8,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Data
 @ConfigurationProperties(prefix = "tianai-rpc")
 public class RpcProperties {
+    private Boolean banner = true;
     private String codec = "hessian2";
     private String registry = "zookeeper";
     private String registryAddress = "127.0.0.1:2181";

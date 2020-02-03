@@ -9,8 +9,9 @@ import cloud.tianai.rpc.springboot.annotation.RpcConsumer;
 import cloud.tianai.rpc.springboot.annotation.RpcProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
+import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
@@ -26,19 +27,40 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
-public class AnnotationBeanProcessor implements BeanPostProcessor, BeanFactoryPostProcessor, ApplicationContextAware, ApplicationListener<ApplicationStartedEvent> {
+public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
 
     private Properties prop;
     private RpcConsumerProperties rpcConsumerProperties;
     private RpcProperties rpcProperties;
     private AbstractApplicationContext applicationContext;
-
+    public static final String BANNER =
+            "  _   _                   _                        \n" +
+                    " | | (_)                 (_)                       \n" +
+                    " | |_ _  __ _ _ __   __ _ _        _ __ _ __   ___ \n" +
+                    " | __| |/ _` | '_ \\ / _` | |______| '__| '_ \\ / __|\n" +
+                    " | |_| | (_| | | | | (_| | |______| |  | |_) | (__ \n" +
+                    "  \\__|_|\\__,_|_| |_|\\__,_|_|      |_|  | .__/ \\___|\n" +
+                    "                                       | |         \n" +
+                    "                                       |_|         ";
     private Map<Object, RpcProvider> rpcProviderMap = new ConcurrentHashMap<Object, RpcProvider>(16);
     private ConfigurableListableBeanFactory beanFactory;
 
     public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties) {
         this.rpcConsumerProperties = rpcConsumerProperties;
         this.rpcProperties = rpcProperties;
+        printBannerIfNecessary(rpcProperties.getBanner());
+    }
+
+    /**
+     * 打印一些骚东西
+     *
+     * @param banner
+     */
+    private void printBannerIfNecessary(Boolean banner) {
+        if (!banner) {
+            return;
+        }
+        System.out.println(BANNER);
     }
 
     @Override
@@ -156,9 +178,8 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, BeanFactoryPo
             rpcProviderMap.clear();
         }
     }
-
     @Override
-    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-        this.beanFactory = beanFactory;
+    public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+        this.beanFactory = (ConfigurableListableBeanFactory)beanFactory;
     }
 }
