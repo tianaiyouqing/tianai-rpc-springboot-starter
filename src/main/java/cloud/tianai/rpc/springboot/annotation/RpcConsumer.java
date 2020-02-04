@@ -10,7 +10,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RpcConsumer {
-    int timeout() default 5000;
 
-    int requestTimeout() default 3000;
+    /** 该参数只针对于该rpc服务初始化指定的参数. */
+    int requestTimeout() default 0;
 }

@@ -115,8 +115,13 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
         } else {
             resultProp = prop = findCommonProp();
         }
-        resultProp.setProperty(RpcClientConfigConstant.TIMEOUT, String.valueOf(rpcConsumer.timeout()));
-        resultProp.setProperty(RpcClientConfigConstant.REQUEST_TIMEOUT, String.valueOf(rpcConsumer.requestTimeout()));
+        int requestTimeout = rpcConsumer.requestTimeout();
+        if(requestTimeout <= 0) {
+            // 设置默认的请求超时时间，可以当做全局使用
+            requestTimeout = rpcConsumerProperties.getDefaultRequestTimeout();
+        }
+        resultProp.setProperty(RpcClientConfigConstant.TIMEOUT, String.valueOf(requestTimeout));
+        resultProp.setProperty(RpcClientConfigConstant.REQUEST_TIMEOUT, String.valueOf(requestTimeout));
         return resultProp;
     }
 
