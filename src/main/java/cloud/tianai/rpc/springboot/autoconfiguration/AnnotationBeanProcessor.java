@@ -1,10 +1,11 @@
 package cloud.tianai.rpc.springboot.autoconfiguration;
 
+import cloud.tianai.rpc.common.RpcClientConfiguration;
+import cloud.tianai.rpc.common.URL;
 import cloud.tianai.rpc.common.exception.RpcException;
 import cloud.tianai.rpc.core.bootstrap.ServerBootstrap;
 import cloud.tianai.rpc.core.client.proxy.RpcProxy;
 import cloud.tianai.rpc.core.client.proxy.impl.JdkRpcProxy;
-import cloud.tianai.rpc.core.constant.RpcClientConfigConstant;
 import cloud.tianai.rpc.springboot.annotation.RpcConsumer;
 import cloud.tianai.rpc.springboot.annotation.RpcProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -23,15 +24,15 @@ import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Field;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
 
-    private Properties prop;
+    private RpcClientConfiguration prop;
     private RpcConsumerProperties rpcConsumerProperties;
     private RpcProperties rpcProperties;
+    private RpcReqistryProperties rpcReqistryProperties;
     private AbstractApplicationContext applicationContext;
     public static final String BANNER =
             "  _   _                   _                        \n" +
@@ -45,9 +46,10 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
     private Map<Object, RpcProvider> rpcProviderMap = new ConcurrentHashMap<Object, RpcProvider>(16);
     private ConfigurableListableBeanFactory beanFactory;
 
-    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties) {
+    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcReqistryProperties rpcReqistryProperties, RpcProperties rpcProperties) {
         this.rpcConsumerProperties = rpcConsumerProperties;
         this.rpcProperties = rpcProperties;
+        this.rpcReqistryProperties = rpcReqistryProperties;
         printBannerIfNecessary(rpcProperties.getBanner());
     }
 
@@ -102,42 +104,41 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
     }
 
     private Object createRpcConsumer(Class<?> type, RpcConsumer rpcConsumer) {
-        Properties rpcConsumerProp = findRpcConsumerConfig(rpcConsumer);
+        RpcClientConfiguration rpcConsumerProp = findRpcConsumerConfig(rpcConsumer);
         RpcProxy rpcProxy = new JdkRpcProxy();
         Object proxy = rpcProxy.createProxy(type, rpcConsumerProp, true, true);
         return proxy;
     }
 
-    private Properties findRpcConsumerConfig(RpcConsumer rpcConsumer) {
-        Properties resultProp;
+    private RpcClientConfiguration findRpcConsumerConfig(RpcConsumer rpcConsumer) {
+        RpcClientConfiguration resultProp;
         if (prop != null) {
-            resultProp = prop;
+            resultProp = new RpcClientConfiguration();
         } else {
             resultProp = prop = findCommonProp();
         }
         int requestTimeout = rpcConsumer.requestTimeout();
-        if(requestTimeout <= 0) {
+        if (requestTimeout <= 0) {
             // 设置默认的请求超时时间，可以当做全局使用
             requestTimeout = rpcConsumerProperties.getDefaultRequestTimeout();
         }
-        resultProp.setProperty(RpcClientConfigConstant.TIMEOUT, String.valueOf(requestTimeout));
-        resultProp.setProperty(RpcClientConfigConstant.REQUEST_TIMEOUT, String.valueOf(requestTimeout));
+        resultProp.setTimeout(requestTimeout);
+        resultProp.setRequestTimeout(requestTimeout);
         return resultProp;
     }
 
-    private Properties findCommonProp() {
-        Properties properties = new Properties();
+    private RpcClientConfiguration findCommonProp() {
+        RpcClientConfiguration properties = new RpcClientConfiguration();
         if (rpcConsumerProperties == null) {
             throw new RpcException("TIANAI-RPC 读取公共客户端消息失败， 未配置 [RpcConsumerProperties]");
         }
-        properties.setProperty(RpcClientConfigConstant.CODEC, rpcProperties.getCodec());
-        properties.setProperty(RpcClientConfigConstant.REGISTER, rpcProperties.getRegistry());
-        properties.setProperty(RpcClientConfigConstant.REGISTRY_HOST, rpcProperties.getRegistryAddress());
-        properties.setProperty(RpcClientConfigConstant.REGISTRY_PORT, String.valueOf(0));
-        properties.setProperty(RpcClientConfigConstant.PROTOCOL, String.valueOf(rpcConsumerProperties.getClient()));
-        properties.setProperty(RpcClientConfigConstant.WORKER_THREADS, String.valueOf(rpcProperties.getWorkerThreads()));
+        properties.setCodec(rpcProperties.getCodec());
+        properties.setRegistryUrl(rpcReqistryProperties.getURL());
+        properties.setProtocol(rpcConsumerProperties.getClient());
+        properties.setWorkerThread(rpcProperties.getWorkerThreads());
         return properties;
     }
+
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
@@ -183,8 +184,9 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
             rpcProviderMap.clear();
         }
     }
+
     @Override
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
-        this.beanFactory = (ConfigurableListableBeanFactory)beanFactory;
+        this.beanFactory = (ConfigurableListableBeanFactory) beanFactory;
     }
 }

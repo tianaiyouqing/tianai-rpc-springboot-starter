@@ -16,22 +16,22 @@ import org.springframework.context.annotation.Configuration;
  * @Description: TIANAI-RPC 自带装配
  */
 @Configuration
-@EnableConfigurationProperties({RpcConsumerProperties.class, RpcProperties.class, RpcProviderProperties.class})
+@EnableConfigurationProperties({RpcConsumerProperties.class, RpcProperties.class, RpcReqistryProperties.class,RpcProviderProperties.class})
 public class RpcAutoConfiguration implements InitializingBean {
 
     @Bean
     @ConditionalOnMissingBean
-    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties) {
-        return new AnnotationBeanProcessor(rpcConsumerProperties, rpcProperties);
+    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties, RpcReqistryProperties rpcReqistryProperties) {
+        return new AnnotationBeanProcessor(rpcConsumerProperties, rpcReqistryProperties, rpcProperties);
     }
 
     @Bean()
     @ConditionalOnProperty(value = "tianai-rpc.server.enable", havingValue = "true")
-    public ServerBootstrap serverBootstrap(RpcProviderProperties rpcProviderProperties, RpcProperties rpcProperties, RpcConsumerProperties rpcConsumerProperties) {
+    public ServerBootstrap serverBootstrap(RpcProviderProperties rpcProviderProperties, RpcProperties rpcProperties, RpcReqistryProperties rpcReqistryProperties) {
         ServerBootstrap serverBootstrap = new ServerBootstrap();
         serverBootstrap.codec(rpcProperties.getCodec())
                 .timeout(rpcProviderProperties.getTimeout())
-                .registry(new URL(rpcProperties.getRegistry(), rpcProperties.getRegistryAddress(), 0))
+                .registry(rpcReqistryProperties.getURL())
                 .server(rpcProviderProperties.getServer())
                 .port(rpcProviderProperties.getPort());
         serverBootstrap.start();
