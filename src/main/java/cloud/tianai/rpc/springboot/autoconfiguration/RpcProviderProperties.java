@@ -1,6 +1,6 @@
 package cloud.tianai.rpc.springboot.autoconfiguration;
 
-import cloud.tianai.rpc.common.CommonConstant;
+import cloud.tianai.rpc.common.constant.CommonConstant;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

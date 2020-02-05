@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>cloud.tianai.rpc</groupId>
     <artifactId>tianai-rpc-springboot-starter</artifactId>
-    <version>1.1</version>
+    <version>1.2</version>
 
     <name>${project.artifactId}</name>
     <description>tianai-rpc by tianaiyouqing</description>
@@ -55,6 +55,7 @@
     <properties>
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <tianai-rpc.version>1.2</tianai-rpc.version>
     </properties>
 
 
@@ -80,24 +81,24 @@
         <dependency>
             <groupId>cloud.tianai.rpc.remoting</groupId>
             <artifactId>rpc-remoting-netty</artifactId>
-            <version>1.1</version>
+            <version>${tianai-rpc.version}</version>
         </dependency>
         <!-- codec -->
         <dependency>
             <groupId>cloud.tianai.rpc.remoting.codec</groupId>
             <artifactId>rpc-remoting-codec-hessian2</artifactId>
-            <version>1.1</version>
+            <version>${tianai-rpc.version}</version>
         </dependency>
         <dependency>
             <groupId>cloud.tianai.rpc</groupId>
             <artifactId>rpc-core</artifactId>
-            <version>1.1</version>
+            <version>${tianai-rpc.version}</version>
         </dependency>
         <!-- registry -->
         <dependency>
             <groupId>cloud.tianai.rpc.register</groupId>
             <artifactId>rpc-register-zookeeper</artifactId>
-            <version>1.1</version>
+            <version>${tianai-rpc.version}</version>
         </dependency>
     </dependencies>
 
