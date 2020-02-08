@@ -28,7 +28,7 @@ public class RpcAutoConfiguration {
         return new AnnotationBeanProcessor(rpcConsumerProperties, rpcReqistryProperties, rpcProperties);
     }
 
-    @Bean()
+    @Bean
     @ConditionalOnProperty(value = "tianai-rpc.server.enable", havingValue = "true")
     public ServerBootstrap serverBootstrap(RpcProviderProperties rpcProviderProperties, RpcProperties rpcProperties, RpcReqistryProperties rpcReqistryProperties) {
         ServerBootstrap serverBootstrap = new ServerBootstrap();
