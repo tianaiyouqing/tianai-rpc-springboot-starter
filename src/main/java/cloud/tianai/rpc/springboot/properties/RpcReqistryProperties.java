@@ -1,4 +1,4 @@
-package cloud.tianai.rpc.springboot.autoconfiguration;
+package cloud.tianai.rpc.springboot.properties;
 
 import cloud.tianai.rpc.common.URL;
 import lombok.Data;

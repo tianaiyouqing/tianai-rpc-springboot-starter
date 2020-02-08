@@ -1,13 +1,15 @@
-package cloud.tianai.rpc.springboot.autoconfiguration;
+package cloud.tianai.rpc.springboot.processor;
 
 import cloud.tianai.rpc.common.RpcClientConfiguration;
-import cloud.tianai.rpc.common.URL;
 import cloud.tianai.rpc.common.exception.RpcException;
 import cloud.tianai.rpc.core.bootstrap.ServerBootstrap;
 import cloud.tianai.rpc.core.client.proxy.RpcProxy;
 import cloud.tianai.rpc.core.client.proxy.impl.JdkRpcProxy;
 import cloud.tianai.rpc.springboot.annotation.RpcConsumer;
 import cloud.tianai.rpc.springboot.annotation.RpcProvider;
+import cloud.tianai.rpc.springboot.properties.RpcProperties;
+import cloud.tianai.rpc.springboot.properties.RpcConsumerProperties;
+import cloud.tianai.rpc.springboot.properties.RpcReqistryProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
@@ -26,6 +28,11 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * @Author: 天爱有情
+ * @Date: 2020/02/08 15:18
+ * @Description: @RpcProvider 和 @RpcConsumer 的解析器
+ */
 @Slf4j
 public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
 
@@ -105,6 +112,8 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
 
     private Object createRpcConsumer(Class<?> type, RpcConsumer rpcConsumer) {
         RpcClientConfiguration rpcConsumerProp = findRpcConsumerConfig(rpcConsumer);
+
+        @SuppressWarnings("rawtypes")
         RpcProxy rpcProxy = new JdkRpcProxy();
         Object proxy = rpcProxy.createProxy(type, rpcConsumerProp, true, true);
         return proxy;
