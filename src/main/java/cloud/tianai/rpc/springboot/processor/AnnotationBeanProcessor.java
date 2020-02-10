@@ -145,6 +145,8 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
         properties.setRegistryUrl(rpcReqistryProperties.getURL());
         properties.setProtocol(rpcConsumerProperties.getClient());
         properties.setWorkerThread(rpcProperties.getWorkerThreads());
+        properties.setRetry(rpcConsumerProperties.getRetry());
+        properties.setLoadBalance(rpcConsumerProperties.getLoadbalance());
         return properties;
     }
 
