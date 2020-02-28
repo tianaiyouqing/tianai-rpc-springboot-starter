@@ -24,20 +24,10 @@ public class RpcAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcProperties rpcProperties, RpcReqistryProperties rpcReqistryProperties) {
-        return new AnnotationBeanProcessor(rpcConsumerProperties, rpcReqistryProperties, rpcProperties);
-    }
-
-    @Bean
-    @ConditionalOnProperty(value = "tianai-rpc.server.enable", havingValue = "true")
-    public ServerBootstrap serverBootstrap(RpcProviderProperties rpcProviderProperties, RpcProperties rpcProperties, RpcReqistryProperties rpcReqistryProperties) {
-        ServerBootstrap serverBootstrap = new ServerBootstrap();
-        serverBootstrap.codec(rpcProperties.getCodec())
-                .timeout(rpcProviderProperties.getTimeout())
-                .registry(rpcReqistryProperties.getURL())
-                .server(rpcProviderProperties.getServer())
-                .port(rpcProviderProperties.getPort());
-        serverBootstrap.start();
-        return serverBootstrap;
+    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties,
+                                                           RpcProperties rpcProperties,
+                                                           RpcReqistryProperties rpcReqistryProperties,
+                                                           RpcProviderProperties rpcProviderProperties) {
+        return new AnnotationBeanProcessor(rpcConsumerProperties, rpcReqistryProperties, rpcProviderProperties, rpcProperties);
     }
 }

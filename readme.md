@@ -28,8 +28,6 @@ tianai-rpc:
   # 序列化 默认hessian2
   codec: hessian2
   server:
-    # server端是否启动， 如果使用rpcServer，必须设置为true， 默认是false
-    enable: true
     # server端启动时的端口， 默认20881
     port: 20883
     # 超时，单位 ms

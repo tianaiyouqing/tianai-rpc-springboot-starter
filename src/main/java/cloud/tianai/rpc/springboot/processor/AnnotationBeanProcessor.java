@@ -1,16 +1,23 @@
 package cloud.tianai.rpc.springboot.processor;
 
-import cloud.tianai.rpc.common.RpcClientConfiguration;
+import cloud.tianai.remoting.api.RpcInvocationPostProcessor;
 import cloud.tianai.rpc.common.exception.RpcException;
+import cloud.tianai.rpc.common.util.CollectionUtils;
 import cloud.tianai.rpc.core.bootstrap.ServerBootstrap;
 import cloud.tianai.rpc.core.client.proxy.RpcProxy;
-import cloud.tianai.rpc.core.client.proxy.impl.JdkRpcProxy;
+import cloud.tianai.rpc.core.client.proxy.RpcProxyFactory;
+import cloud.tianai.rpc.core.client.proxy.RpcProxyType;
+import cloud.tianai.rpc.core.configuration.RpcClientConfiguration;
+import cloud.tianai.rpc.core.configuration.RpcServerConfiguration;
+import cloud.tianai.rpc.core.template.RpcClientPostProcessor;
 import cloud.tianai.rpc.springboot.annotation.RpcConsumer;
 import cloud.tianai.rpc.springboot.annotation.RpcProvider;
-import cloud.tianai.rpc.springboot.properties.RpcProperties;
 import cloud.tianai.rpc.springboot.properties.RpcConsumerProperties;
+import cloud.tianai.rpc.springboot.properties.RpcProperties;
+import cloud.tianai.rpc.springboot.properties.RpcProviderProperties;
 import cloud.tianai.rpc.springboot.properties.RpcReqistryProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
@@ -25,6 +32,8 @@ import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Field;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,10 +46,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
 
     private RpcClientConfiguration prop;
-    private RpcConsumerProperties rpcConsumerProperties;
     private RpcProperties rpcProperties;
+    private RpcConsumerProperties rpcConsumerProperties;
     private RpcReqistryProperties rpcReqistryProperties;
+    private RpcProviderProperties rpcProviderProperties;
     private AbstractApplicationContext applicationContext;
+    private Map<Object, RpcProvider> rpcProviderMap = new ConcurrentHashMap<Object, RpcProvider>(16);
     public static final String BANNER =
             "  _   _                   _                        \n" +
                     " | | (_)                 (_)                       \n" +
@@ -50,13 +61,16 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
                     "  \\__|_|\\__,_|_| |_|\\__,_|_|      |_|  | .__/ \\___|\n" +
                     "                                       | |         \n" +
                     "                                       |_|         ";
-    private Map<Object, RpcProvider> rpcProviderMap = new ConcurrentHashMap<Object, RpcProvider>(16);
     private ConfigurableListableBeanFactory beanFactory;
 
-    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties, RpcReqistryProperties rpcReqistryProperties, RpcProperties rpcProperties) {
+    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties,
+                                   RpcReqistryProperties rpcReqistryProperties,
+                                   RpcProviderProperties rpcProviderProperties,
+                                   RpcProperties rpcProperties) {
         this.rpcConsumerProperties = rpcConsumerProperties;
         this.rpcProperties = rpcProperties;
         this.rpcReqistryProperties = rpcReqistryProperties;
+        this.rpcProviderProperties = rpcProviderProperties;
         printBannerIfNecessary(rpcProperties.getBanner());
     }
 
@@ -112,11 +126,30 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
 
     private Object createRpcConsumer(Class<?> type, RpcConsumer rpcConsumer) {
         RpcClientConfiguration rpcConsumerProp = findRpcConsumerConfig(rpcConsumer);
-
-        @SuppressWarnings("rawtypes")
-        RpcProxy rpcProxy = new JdkRpcProxy();
-        Object proxy = rpcProxy.createProxy(type, rpcConsumerProp, true, true);
+        RpcProxyType rpcProxyType = getRpcProxyType(rpcConsumer, rpcConsumerProperties);
+        Object proxy = RpcProxyFactory.create(type, rpcConsumerProp, rpcProxyType);
         return proxy;
+    }
+
+    private RpcProxyType getRpcProxyType(RpcConsumer rpcConsumer, RpcConsumerProperties rpcConsumerProperties) {
+        String proxy = rpcConsumer.proxy();
+        RpcProxyType rpcProxyType;
+        try {
+            rpcProxyType = RpcProxyType.valueOf(proxy);
+        } catch (IllegalArgumentException e) {
+            // 找不到枚举
+            rpcProxyType = null;
+        }
+        if (rpcProxyType != null) {
+            return rpcProxyType;
+        }
+
+        // 寻找一下默认配置
+        rpcProxyType = rpcConsumerProperties.getDefaultProxyType();
+        if (rpcProxyType == null) {
+            rpcProxyType = RpcProxyType.JAVASSIST_PROXY;
+        }
+        return rpcProxyType;
     }
 
     private RpcClientConfiguration findRpcConsumerConfig(RpcConsumer rpcConsumer) {
@@ -133,7 +166,36 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
         }
         resultProp.setTimeout(requestTimeout);
         resultProp.setRequestTimeout(requestTimeout);
+        resultProp.setLazyLoadRegistry(rpcConsumerProperties.isLazyLoadRegistry());
+        resultProp.setLazyStartRpcClient(rpcConsumerProperties.isLazyStartRpcClient());
+        // 装配 RpcClientPostProcessor
+        List<RpcClientPostProcessor> rpcClientPostProcessors = getRpcClientPostProcessors();
+        if (CollectionUtils.isNotEmpty(rpcClientPostProcessors)) {
+            rpcClientPostProcessors.forEach(resultProp::addRpcClientPostProcessor);
+        }
+
         return resultProp;
+    }
+
+
+    private List<RpcClientPostProcessor> getRpcClientPostProcessors() {
+        List<RpcClientPostProcessor> result = new LinkedList<>();
+        String[] names = beanFactory.getBeanNamesForType(RpcClientPostProcessor.class, true, false);
+        for (String name : names) {
+            RpcClientPostProcessor bean = beanFactory.getBean(name, RpcClientPostProcessor.class);
+            result.add(bean);
+        }
+        return result;
+    }
+
+    private List<RpcInvocationPostProcessor> getRpcInvocationPostProcessors() {
+        List<RpcInvocationPostProcessor> result = new LinkedList<>();
+        String[] names = beanFactory.getBeanNamesForType(RpcInvocationPostProcessor.class, true, false);
+        for (String name : names) {
+            RpcInvocationPostProcessor bean = beanFactory.getBean(name, RpcInvocationPostProcessor.class);
+            result.add(bean);
+        }
+        return result;
     }
 
     private RpcClientConfiguration findCommonProp() {
@@ -175,26 +237,50 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
 
     @Override
     public void onApplicationEvent(ApplicationStartedEvent event) {
-        ServerBootstrap serverBootstrap = null;
+        if (rpcProviderMap.isEmpty()) {
+            return;
+        }
+        ServerBootstrap serverBootstrap;
         try {
-            serverBootstrap = applicationContext.getBean(ServerBootstrap.class);
+            serverBootstrap = beanFactory.getBean(ServerBootstrap.class);
         } catch (NoSuchBeanDefinitionException e) {
-            serverBootstrap = null;
+            serverBootstrap = createServerBootstrap();
+            beanFactory.registerSingleton(serverBootstrap.getClass().getName(), serverBootstrap);
         }
-        if (!rpcProviderMap.isEmpty()) {
-            if (serverBootstrap == null) {
-                throw new RpcException("TIANAI-RPC 注册server时未找到 [ServerBootstrap], 待注册的类:" + rpcProviderMap.keySet());
+        final ServerBootstrap finalServerBootstrap = serverBootstrap;
+        rpcProviderMap.forEach((bean, anno) -> {
+            Class<?> targetClass;
+            if(AopUtils.isAopProxy(bean)) {
+                targetClass = AopUtils.getTargetClass(bean);
+            }else {
+                targetClass = bean.getClass();
             }
-            ServerBootstrap finalServerBootstrap = serverBootstrap;
-            rpcProviderMap.forEach((bean, anno) -> {
-                Class<?> interfaceClass = bean.getClass().getInterfaces()[0];
-                finalServerBootstrap.register(interfaceClass, bean);
-                log.info("TIANAI-RPC SERVER register[{}]", interfaceClass.getName());
-            });
-            // 注册完的话直接情况即可， 优化内存
-            rpcProviderMap.clear();
-        }
+            Class<?> interfaceClass = targetClass.getInterfaces()[0];
+            finalServerBootstrap.register(interfaceClass, bean);
+            log.info("TIANAI-RPC SERVER register[{}]", interfaceClass.getName());
+        });
+        // 注册完的话直接情况即可， 优化内存
+        rpcProviderMap.clear();
     }
+
+    private ServerBootstrap createServerBootstrap() {
+        ServerBootstrap serverBootstrap = new ServerBootstrap();
+        RpcServerConfiguration prop = serverBootstrap.getProp();
+        prop.setTimeout(rpcProviderProperties.getTimeout());
+        prop.setRegistryUrl(rpcReqistryProperties.getURL());
+        prop.setProtocol(rpcProviderProperties.getServer());
+        prop.setPort(rpcProviderProperties.getPort());
+        // 读取对应的invocationPostProcessor并进行装配
+        List<RpcInvocationPostProcessor> rpcInvocationPostProcessors = getRpcInvocationPostProcessors();
+        Map<String, RpcInvocationPostProcessor> rpcInvocationPostProcessorMap = beanFactory.getBeansOfType(RpcInvocationPostProcessor.class);
+        if (CollectionUtils.isNotEmpty(rpcInvocationPostProcessors)) {
+            rpcInvocationPostProcessors.forEach(prop::addRpcInvocationPostProcessor);
+        }
+        // 启动
+        serverBootstrap.start();
+        return serverBootstrap;
+    }
+
 
     @Override
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
