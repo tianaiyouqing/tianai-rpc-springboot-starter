@@ -266,10 +266,14 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
     private ServerBootstrap createServerBootstrap() {
         ServerBootstrap serverBootstrap = new ServerBootstrap();
         RpcServerConfiguration prop = serverBootstrap.getProp();
-        prop.setTimeout(rpcProviderProperties.getTimeout());
         prop.setRegistryUrl(rpcReqistryProperties.getURL());
+        prop.setCodec(rpcProperties.getCodec());
+        prop.setTimeout(rpcProviderProperties.getTimeout());
         prop.setProtocol(rpcProviderProperties.getServer());
+        prop.setWorkerThread(rpcProperties.getWorkerThreads());
         prop.setPort(rpcProviderProperties.getPort());
+        prop.setBossThreads(rpcProviderProperties.getBossThreads());
+
         // 读取对应的invocationPostProcessor并进行装配
         List<RpcInvocationPostProcessor> rpcInvocationPostProcessors = getRpcInvocationPostProcessors();
         Map<String, RpcInvocationPostProcessor> rpcInvocationPostProcessorMap = beanFactory.getBeansOfType(RpcInvocationPostProcessor.class);

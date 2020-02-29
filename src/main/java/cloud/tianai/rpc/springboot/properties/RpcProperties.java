@@ -8,6 +8,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "tianai-rpc")
 public class RpcProperties {
     private Boolean banner = true;
-    private String codec = "hessian2";
+    private String codec = "protostuff";
     private Integer workerThreads = CommonConstant.DEFAULT_IO_THREADS;
 }

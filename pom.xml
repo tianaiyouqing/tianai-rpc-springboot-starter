@@ -86,7 +86,7 @@
         <!-- codec -->
         <dependency>
             <groupId>cloud.tianai.rpc.remoting.codec</groupId>
-            <artifactId>rpc-remoting-codec-hessian2</artifactId>
+            <artifactId>rpc-remoting-codec-protostuff</artifactId>
             <version>${tianai-rpc.version}</version>
         </dependency>
         <dependency>
