@@ -8,7 +8,7 @@
 <dependency>
     <groupId>cloud.tianai.rpc</groupId>
     <artifactId>tianai-rpc-springboot-starter</artifactId>
-    <version>1.3</version>
+    <version>1.3.7</version>
 </dependency>
 ```
 
