@@ -1,4 +1,4 @@
-package cloud.tianai.rpc.springboot.processor;
+package cloud.tianai.rpc.springboot.annotation;
 
 import cloud.tianai.remoting.api.RpcInvocationPostProcessor;
 import cloud.tianai.rpc.common.exception.RpcException;
@@ -29,6 +29,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Field;
@@ -43,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @Description: @RpcProvider 和 @RpcConsumer 的解析器
  */
 @Slf4j
-public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
+public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
 
     private RpcClientConfiguration prop;
     private RpcProperties rpcProperties;
@@ -63,7 +64,7 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
                     "                                       |_|         ";
     private ConfigurableListableBeanFactory beanFactory;
 
-    public AnnotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties,
+    public TianAiRpcAnnotationBean(RpcConsumerProperties rpcConsumerProperties,
                                    RpcReqistryProperties rpcReqistryProperties,
                                    RpcProviderProperties rpcProviderProperties,
                                    RpcProperties rpcProperties) {
@@ -171,6 +172,8 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
         // 装配 RpcClientPostProcessor
         List<RpcClientPostProcessor> rpcClientPostProcessors = getRpcClientPostProcessors();
         if (CollectionUtils.isNotEmpty(rpcClientPostProcessors)) {
+            // 排序
+            AnnotationAwareOrderComparator.sort(rpcClientPostProcessors);
             rpcClientPostProcessors.forEach(resultProp::addRpcClientPostProcessor);
         }
 
@@ -256,7 +259,8 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
                 targetClass = bean.getClass();
             }
             Class<?> interfaceClass = targetClass.getInterfaces()[0];
-            finalServerBootstrap.register(interfaceClass, bean);
+            // 添加权重
+            finalServerBootstrap.register(interfaceClass, bean, anno.weight());
             log.info("TIANAI-RPC SERVER register[{}]", interfaceClass.getName());
         });
         // 注册完的话直接情况即可， 优化内存
@@ -276,8 +280,10 @@ public class AnnotationBeanProcessor implements BeanPostProcessor, ApplicationCo
 
         // 读取对应的invocationPostProcessor并进行装配
         List<RpcInvocationPostProcessor> rpcInvocationPostProcessors = getRpcInvocationPostProcessors();
-        Map<String, RpcInvocationPostProcessor> rpcInvocationPostProcessorMap = beanFactory.getBeansOfType(RpcInvocationPostProcessor.class);
         if (CollectionUtils.isNotEmpty(rpcInvocationPostProcessors)) {
+            // 排序
+            AnnotationAwareOrderComparator.sort(rpcInvocationPostProcessors);
+
             rpcInvocationPostProcessors.forEach(prop::addRpcInvocationPostProcessor);
         }
         // 启动

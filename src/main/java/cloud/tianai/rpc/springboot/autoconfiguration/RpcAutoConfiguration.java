@@ -1,13 +1,11 @@
 package cloud.tianai.rpc.springboot.autoconfiguration;
 
-import cloud.tianai.rpc.core.bootstrap.ServerBootstrap;
-import cloud.tianai.rpc.springboot.processor.AnnotationBeanProcessor;
+import cloud.tianai.rpc.springboot.annotation.TianAiRpcAnnotationBean;
 import cloud.tianai.rpc.springboot.properties.RpcConsumerProperties;
 import cloud.tianai.rpc.springboot.properties.RpcProperties;
 import cloud.tianai.rpc.springboot.properties.RpcProviderProperties;
 import cloud.tianai.rpc.springboot.properties.RpcReqistryProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,10 +22,10 @@ public class RpcAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public AnnotationBeanProcessor annotationBeanProcessor(RpcConsumerProperties rpcConsumerProperties,
-                                                           RpcProperties rpcProperties,
-                                                           RpcReqistryProperties rpcReqistryProperties,
-                                                           RpcProviderProperties rpcProviderProperties) {
-        return new AnnotationBeanProcessor(rpcConsumerProperties, rpcReqistryProperties, rpcProviderProperties, rpcProperties);
+    public TianAiRpcAnnotationBean annotationBean(RpcConsumerProperties rpcConsumerProperties,
+                                                  RpcProperties rpcProperties,
+                                                  RpcReqistryProperties rpcReqistryProperties,
+                                                  RpcProviderProperties rpcProviderProperties) {
+        return new TianAiRpcAnnotationBean(rpcConsumerProperties, rpcReqistryProperties, rpcProviderProperties, rpcProperties);
     }
 }

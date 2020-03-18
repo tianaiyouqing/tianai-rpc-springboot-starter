@@ -1,7 +1,7 @@
 package cloud.tianai.rpc.springboot.properties;
 
 import cloud.tianai.rpc.core.client.proxy.RpcProxyType;
-import cloud.tianai.rpc.core.loadbalance.impl.RoundRobinLoadBalance;
+import cloud.tianai.rpc.core.loadbalance.impl.RandomLoadBalance;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -16,8 +16,8 @@ public class RpcConsumerProperties {
     /** 重试次数. */
     private Integer retry = 3;
 
-    /** 默认是轮询模式. */
-    private String loadbalance = RoundRobinLoadBalance.NAME;
+    /** 默认是权重随机模式. */
+    private String loadbalance = RandomLoadBalance.NAME;
 
     /** 懒加载服务注册. */
     private boolean lazyLoadRegistry = true;
