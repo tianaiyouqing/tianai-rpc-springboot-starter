@@ -17,15 +17,12 @@ import org.springframework.context.annotation.Configuration;
  * @Description: TIANAI-RPC 自动装配
  */
 @Configuration
-@EnableConfigurationProperties({RpcConsumerProperties.class, RpcProperties.class, RpcReqistryProperties.class, RpcProviderProperties.class})
+@EnableConfigurationProperties({RpcProperties.class})
 public class RpcAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public TianAiRpcAnnotationBean annotationBean(RpcConsumerProperties rpcConsumerProperties,
-                                                  RpcProperties rpcProperties,
-                                                  RpcReqistryProperties rpcReqistryProperties,
-                                                  RpcProviderProperties rpcProviderProperties) {
-        return new TianAiRpcAnnotationBean(rpcConsumerProperties, rpcReqistryProperties, rpcProviderProperties, rpcProperties);
+    public TianAiRpcAnnotationBean annotationBean(RpcProperties rpcProperties) {
+        return new TianAiRpcAnnotationBean(rpcProperties);
     }
 }

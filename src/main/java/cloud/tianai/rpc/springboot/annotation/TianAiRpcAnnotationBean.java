@@ -1,7 +1,5 @@
 package cloud.tianai.rpc.springboot.annotation;
 
-import cloud.tianai.remoting.api.RpcClientPostProcessor;
-import cloud.tianai.remoting.api.RpcInvocationPostProcessor;
 import cloud.tianai.rpc.common.exception.RpcException;
 import cloud.tianai.rpc.common.util.CollectionUtils;
 import cloud.tianai.rpc.core.bootstrap.ServerBootstrap;
@@ -9,6 +7,8 @@ import cloud.tianai.rpc.core.client.proxy.RpcProxyFactory;
 import cloud.tianai.rpc.core.client.proxy.RpcProxyType;
 import cloud.tianai.rpc.core.configuration.RpcClientConfiguration;
 import cloud.tianai.rpc.core.configuration.RpcServerConfiguration;
+import cloud.tianai.rpc.remoting.api.RpcClientPostProcessor;
+import cloud.tianai.rpc.remoting.api.RpcInvocationPostProcessor;
 import cloud.tianai.rpc.springboot.properties.RpcConsumerProperties;
 import cloud.tianai.rpc.springboot.properties.RpcProperties;
 import cloud.tianai.rpc.springboot.properties.RpcProviderProperties;
@@ -30,10 +30,13 @@ import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
 
 import java.lang.reflect.Field;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static cloud.tianai.rpc.common.constant.CommonConstant.*;
 
 /**
  * @Author: 天爱有情
@@ -45,9 +48,6 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
 
     private RpcClientConfiguration prop;
     private RpcProperties rpcProperties;
-    private RpcConsumerProperties rpcConsumerProperties;
-    private RpcReqistryProperties rpcReqistryProperties;
-    private RpcProviderProperties rpcProviderProperties;
     private AbstractApplicationContext applicationContext;
     private Map<Object, RpcProvider> rpcProviderMap = new ConcurrentHashMap<Object, RpcProvider>(16);
     public static final String BANNER =
@@ -61,14 +61,8 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
                     "                                       |_|         ";
     private ConfigurableListableBeanFactory beanFactory;
 
-    public TianAiRpcAnnotationBean(RpcConsumerProperties rpcConsumerProperties,
-                                   RpcReqistryProperties rpcReqistryProperties,
-                                   RpcProviderProperties rpcProviderProperties,
-                                   RpcProperties rpcProperties) {
-        this.rpcConsumerProperties = rpcConsumerProperties;
+    public TianAiRpcAnnotationBean(RpcProperties rpcProperties) {
         this.rpcProperties = rpcProperties;
-        this.rpcReqistryProperties = rpcReqistryProperties;
-        this.rpcProviderProperties = rpcProviderProperties;
         printBannerIfNecessary(rpcProperties.getBanner());
     }
 
@@ -124,12 +118,12 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
 
     private Object createRpcConsumer(Class<?> type, RpcConsumer rpcConsumer) {
         RpcClientConfiguration rpcConsumerProp = findRpcConsumerConfig(rpcConsumer);
-        RpcProxyType rpcProxyType = getRpcProxyType(rpcConsumer, rpcConsumerProperties);
+        RpcProxyType rpcProxyType = getRpcProxyType(rpcConsumer, rpcProperties);
         Object proxy = RpcProxyFactory.create(type, rpcConsumerProp, rpcProxyType);
         return proxy;
     }
 
-    private RpcProxyType getRpcProxyType(RpcConsumer rpcConsumer, RpcConsumerProperties rpcConsumerProperties) {
+    private RpcProxyType getRpcProxyType(RpcConsumer rpcConsumer, RpcProperties prop ) {
         String proxy = rpcConsumer.proxy();
         RpcProxyType rpcProxyType;
         try {
@@ -143,7 +137,7 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
         }
 
         // 寻找一下默认配置
-        rpcProxyType = rpcConsumerProperties.getDefaultProxyType();
+        rpcProxyType = prop.getClient().getDefaultProxyType();
         if (rpcProxyType == null) {
             rpcProxyType = RpcProxyType.JAVASSIST_PROXY;
         }
@@ -160,12 +154,12 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
         int requestTimeout = rpcConsumer.requestTimeout();
         if (requestTimeout <= 0) {
             // 设置默认的请求超时时间，可以当做全局使用
-            requestTimeout = rpcConsumerProperties.getDefaultRequestTimeout();
+            requestTimeout = rpcProperties.getClient().getDefaultRequestTimeout();
         }
         resultProp.setTimeout(requestTimeout);
         resultProp.setRequestTimeout(requestTimeout);
-        resultProp.setLazyLoadRegistry(rpcConsumerProperties.isLazyLoadRegistry());
-        resultProp.setLazyStartRpcClient(rpcConsumerProperties.isLazyStartRpcClient());
+        resultProp.setLazyLoadRegistry(rpcProperties.getClient().isLazyLoadRegistry());
+        resultProp.setLazyStartRpcClient(rpcProperties.getClient().isLazyStartRpcClient());
         // 装配 RpcClientPostProcessor
         List<RpcClientPostProcessor> rpcClientPostProcessors = getRpcClientPostProcessors();
         if (CollectionUtils.isNotEmpty(rpcClientPostProcessors)) {
@@ -200,15 +194,15 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
 
     private RpcClientConfiguration findCommonProp() {
         RpcClientConfiguration properties = new RpcClientConfiguration();
-        if (rpcConsumerProperties == null) {
+        if (rpcProperties.getClient() == null) {
             throw new RpcException("TIANAI-RPC 读取公共客户端消息失败， 未配置 [RpcConsumerProperties]");
         }
         properties.setCodec(rpcProperties.getCodec());
-        properties.setRegistryUrl(rpcReqistryProperties.getURL());
-        properties.setProtocol(rpcConsumerProperties.getClient());
-        properties.setWorkerThread(rpcProperties.getWorkerThreads());
-        properties.setRetry(rpcConsumerProperties.getRetry());
-        properties.setLoadBalance(rpcConsumerProperties.getLoadbalance());
+        properties.setRegistryUrl(rpcProperties.getRegistry().getURL());
+        properties.setProtocol(rpcProperties.getClient().getClient());
+        properties.addParameter(RPC_WORKER_THREADS_KEY, rpcProperties.getWorkerThreads());
+        properties.setRetry(rpcProperties.getClient().getRetry());
+        properties.setLoadBalance(rpcProperties.getClient().getLoadbalance());
         return properties;
     }
 
@@ -256,8 +250,12 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
                 targetClass = bean.getClass();
             }
             Class<?> interfaceClass = targetClass.getInterfaces()[0];
-            // 添加权重
-            finalServerBootstrap.register(interfaceClass, bean, anno.weight());
+            Map<String, Object> paramMap = new HashMap<>(8);
+            CollectionUtils.toStringMap(anno.parameters()).forEach(paramMap :: put);
+            // 权重
+            paramMap.put(WEIGHT_KEY, String.valueOf(anno.weight()));
+            // 注册
+            finalServerBootstrap.register(interfaceClass, bean, paramMap);
             log.info("TIANAI-RPC SERVER register[{}]", interfaceClass.getName());
         });
         // 注册完的话直接情况即可， 优化内存
@@ -266,22 +264,30 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
 
     private ServerBootstrap createServerBootstrap() {
         ServerBootstrap serverBootstrap = new ServerBootstrap();
-        RpcServerConfiguration prop = serverBootstrap.getProp();
-        prop.setRegistryUrl(rpcReqistryProperties.getURL());
-        prop.setCodec(rpcProperties.getCodec());
-        prop.setTimeout(rpcProviderProperties.getTimeout());
-        prop.setProtocol(rpcProviderProperties.getServer());
-        prop.setWorkerThread(rpcProperties.getWorkerThreads());
-        prop.setPort(rpcProviderProperties.getPort());
-        prop.setBossThreads(rpcProviderProperties.getBossThreads());
+//        RpcServerConfiguration prop = serverBootstrap.getProp();
+        serverBootstrap
+                // 服务注册
+                .registry(rpcProperties.getRegistry().getURL())
+                // 编解码
+                .codec(rpcProperties.getCodec())
+                // 超时
+                .timeout(rpcProperties.getServer().getTimeout())
+                // 协议
+                .protocol(rpcProperties.getServer().getServer())
+                // 工作线程
+                .workThreads(rpcProperties.getWorkerThreads())
+                // 端口
+                .port(rpcProperties.getServer().getPort())
+                // boss线程
+                .bossThreads(rpcProperties.getServer().getBossThreads());
 
         // 读取对应的invocationPostProcessor并进行装配
         List<RpcInvocationPostProcessor> rpcInvocationPostProcessors = getRpcInvocationPostProcessors();
         if (CollectionUtils.isNotEmpty(rpcInvocationPostProcessors)) {
             // 排序
             AnnotationAwareOrderComparator.sort(rpcInvocationPostProcessors);
-
-            rpcInvocationPostProcessors.forEach(prop::addRpcInvocationPostProcessor);
+            // 添加解析器
+            rpcInvocationPostProcessors.forEach(serverBootstrap::addRpcInvocationPostProcessor);
         }
         // 启动
         serverBootstrap.start();

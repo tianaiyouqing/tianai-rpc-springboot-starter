@@ -17,4 +17,9 @@ public @interface RpcProvider {
      * @return
      */
     int weight() default 100;
+
+    /**
+     * 自定义参数键值对，如: {key1, value1, key2, value2}
+     */
+    String[] parameters() default {};
 }
