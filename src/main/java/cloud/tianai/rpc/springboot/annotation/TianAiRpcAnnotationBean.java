@@ -6,21 +6,21 @@ import cloud.tianai.rpc.core.bootstrap.ServerBootstrap;
 import cloud.tianai.rpc.core.client.proxy.RpcProxyFactory;
 import cloud.tianai.rpc.core.client.proxy.RpcProxyType;
 import cloud.tianai.rpc.core.configuration.RpcClientConfiguration;
-import cloud.tianai.rpc.core.configuration.RpcServerConfiguration;
 import cloud.tianai.rpc.remoting.api.RpcClientPostProcessor;
 import cloud.tianai.rpc.remoting.api.RpcInvocationPostProcessor;
-import cloud.tianai.rpc.springboot.properties.RpcConsumerProperties;
 import cloud.tianai.rpc.springboot.properties.RpcProperties;
-import cloud.tianai.rpc.springboot.properties.RpcProviderProperties;
-import cloud.tianai.rpc.springboot.properties.RpcReqistryProperties;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.support.AopUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
+import org.springframework.beans.PropertyValues;
+import org.springframework.beans.factory.BeanCreationException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.annotation.InjectionMetadata;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor;
 import org.springframework.boot.context.event.ApplicationStartedEvent;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextAware;
@@ -28,15 +28,26 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.support.AbstractApplicationContext;
 import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.core.annotation.MergedAnnotation;
+import org.springframework.core.annotation.MergedAnnotations;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.util.StringUtils;
 
+import java.beans.PropertyDescriptor;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
-import static cloud.tianai.rpc.common.constant.CommonConstant.*;
+import static cloud.tianai.rpc.common.constant.CommonConstant.RPC_WORKER_THREADS_KEY;
+import static cloud.tianai.rpc.common.constant.CommonConstant.WEIGHT_KEY;
+import static org.springframework.core.BridgeMethodResolver.findBridgedMethod;
+import static org.springframework.core.BridgeMethodResolver.isVisibilityBridgeMethodPair;
 
 /**
  * @Author: 天爱有情
@@ -44,8 +55,7 @@ import static cloud.tianai.rpc.common.constant.CommonConstant.*;
  * @Description: @RpcProvider 和 @RpcConsumer 的解析器
  */
 @Slf4j
-public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
-
+public class TianAiRpcAnnotationBean implements SmartInstantiationAwareBeanPostProcessor, ApplicationContextAware, BeanFactoryAware, ApplicationListener<ApplicationStartedEvent> {
     private RpcClientConfiguration prop;
     private RpcProperties rpcProperties;
     private AbstractApplicationContext applicationContext;
@@ -61,9 +71,15 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
                     "                                       |_|         ";
     private ConfigurableListableBeanFactory beanFactory;
 
+    private final Set<Class<? extends Annotation>> annotationTypes = new LinkedHashSet<>(4);
+
+        private final ConcurrentMap<String, InjectionMetadata> injectionMetadataCache =
+            new ConcurrentHashMap<>(32);
+
     public TianAiRpcAnnotationBean(RpcProperties rpcProperties) {
         this.rpcProperties = rpcProperties;
         printBannerIfNecessary(rpcProperties.getBanner());
+        annotationTypes.add(RpcConsumer.class);
     }
 
     /**
@@ -79,41 +95,116 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
     }
 
     @Override
-    public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-        Field[] fields = bean.getClass().getDeclaredFields();
-        for (Field field : fields) {
-            if (!field.isAccessible()) {
-                field.setAccessible(true);
-            }
-            RpcConsumer rpcConsumer = field.getAnnotation(RpcConsumer.class);
-            if (rpcConsumer != null) {
-                Object value = getValue(rpcConsumer, field);
-                if (value != null) {
-                    try {
-                        field.set(bean, value);
-                    } catch (IllegalAccessException e) {
-                        log.error("Failed to init remote service RpcConsumer at filed " + field.getName() + " in class " + bean.getClass().getName() + ", cause: " + e.getMessage(), e);
-                    }
-                }
-            }
+    public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) throws BeansException {
+        InjectionMetadata metadata = findInjectionMetadata(bean.getClass(), beanName);
+        try {
+            metadata.inject(bean, beanName, pvs);
+        } catch (BeanCreationException ex) {
+            throw ex;
+        } catch (Throwable ex) {
+            throw new BeanCreationException(beanName, "Injection of @" +annotationTypes.iterator().next().getSimpleName()
+                    + " dependencies is failed", ex);
+        }
+        return pvs;
+    }
 
+    public InjectionMetadata findInjectionMetadata(Class<?> beanClass, String beanName) {
+        String cacheKey = (StringUtils.hasLength(beanName) ? beanName : beanClass.getName());
+        return injectionMetadataCache.computeIfAbsent(cacheKey, k -> buildRpcConsumerMetadata(beanClass));
+    }
+
+
+    private InjectionMetadata buildRpcConsumerMetadata(final Class<?> beanClass) {
+        if (!AnnotationUtils.isCandidateClass(beanClass, this.annotationTypes)) {
+            return InjectionMetadata.EMPTY;
+        }
+        List<InjectionMetadata.InjectedElement> elements = new ArrayList<>();
+        Class<?> targetClass = beanClass;
+
+        do {
+            final List<InjectionMetadata.InjectedElement> currElements = new ArrayList<>();
+            // 读取field
+            ReflectionUtils.doWithLocalFields(targetClass, field -> {
+                MergedAnnotation<?> ann = findAnnotation(field);
+                if (ann != null) {
+                    if (Modifier.isStatic(field.getModifiers())) {
+                        if (log.isInfoEnabled()) {
+                            log.info("Autowired annotation is not supported on static fields: " + field);
+                        }
+                        return;
+                    }
+                    currElements.add(new AnnotationFieldElement(field, ann));
+                }
+            });
+
+            // 读取方法
+            ReflectionUtils.doWithLocalMethods(targetClass, method -> {
+                Method bridgedMethod = findBridgedMethod(method);
+                if (!isVisibilityBridgeMethodPair(method, bridgedMethod)) {
+                    return;
+                }
+                MergedAnnotation<?> ann = findAnnotation(method);
+                if (ann != null && method.equals(ClassUtils.getMostSpecificMethod(method, beanClass))) {
+                    if (Modifier.isStatic(method.getModifiers())) {
+                        if (log.isInfoEnabled()) {
+                            log.info("Autowired annotation is not supported on static methods: " + method);
+                        }
+                        return;
+                    }
+                    PropertyDescriptor pd = BeanUtils.findPropertyForMethod(bridgedMethod, beanClass);
+                    currElements.add(new AnnotatedMethodElement(method, pd, ann));
+                }
+            });
+
+            elements.addAll(currElements);
+            targetClass = targetClass.getSuperclass();
+        }while (targetClass != Object.class);
+        return new InjectionMetadata(beanClass, elements);
+    }
+
+
+
+
+
+
+    private MergedAnnotation<?> findAnnotation(AccessibleObject ao) {
+        MergedAnnotations annotations = MergedAnnotations.from(ao);
+        for (Class<? extends Annotation> type : this.annotationTypes) {
+            MergedAnnotation<?> annotation = annotations.get(type);
+            if (annotation.isPresent()) {
+                return annotation;
+            }
+        }
+        return null;
+    }
+
+    private Object getValue(RpcConsumer rpcConsumer, Class<?> injectedType) {
+        Object bean = null;
+        try {
+            bean = beanFactory.getBean(injectedType);
+            return bean;
+        } catch (NoSuchBeanDefinitionException e) {
+            // 如果没有这个bean， 进行创建
+            bean = createRpcConsumer(injectedType, rpcConsumer);
+            beanFactory.registerSingleton(bean.getClass().getSimpleName(), bean);
+            log.info("TIANAI-RPC CLIENT create:" + injectedType);
         }
         return bean;
     }
 
-    private Object getValue(RpcConsumer rpcConsumer, Field field) {
-        Class<?> type = field.getType();
-        Object bean = null;
-        try {
-            bean = beanFactory.getBean(type);
-            return bean;
-        } catch (NoSuchBeanDefinitionException e) {
-            // 如果没有这个bean， 进行创建
-            bean = createRpcConsumer(type, rpcConsumer);
-            beanFactory.registerSingleton(bean.getClass().getSimpleName(), bean);
-            log.info("TIANAI-RPC CLIENT create:" + type);
+    protected Object getValue(MergedAnnotation ann, Class<?> injectedType, AccessibleObject target) {
+        RpcConsumer annotation;
+        if (RpcConsumer.class.isAssignableFrom(ann.getType())) {
+            annotation = AnnotationUtils.findAnnotation(target, RpcConsumer.class);
+
+        }else {
+            try {
+                annotation = RpcConsumer.class.newInstance();
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(ex.getMessage());
+            }
         }
-        return bean;
+        return getValue(annotation, injectedType);
     }
 
     private Object createRpcConsumer(Class<?> type, RpcConsumer rpcConsumer) {
@@ -262,6 +353,10 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
         rpcProviderMap.clear();
     }
 
+    /**
+     * 创建 ServerBootstrap
+     * @return
+     */
     private ServerBootstrap createServerBootstrap() {
         ServerBootstrap serverBootstrap = new ServerBootstrap();
 //        RpcServerConfiguration prop = serverBootstrap.getProp();
@@ -298,5 +393,59 @@ public class TianAiRpcAnnotationBean implements BeanPostProcessor, ApplicationCo
     @Override
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
         this.beanFactory = (ConfigurableListableBeanFactory) beanFactory;
+    }
+
+    /**
+     * @Author: 天爱有情
+     * @Date: 2020/04/28 17:53
+     * @Description: field注入
+     */
+    private class AnnotationFieldElement extends InjectionMetadata.InjectedElement{
+        private MergedAnnotation ann;
+        public AnnotationFieldElement(Field field, MergedAnnotation<?> ann) {
+            super(field, null);
+            this.ann = ann;
+        }
+        @Override
+        protected void inject(Object target, String beanName, PropertyValues pvs) throws Throwable {
+
+            Field field = (Field) this.member;
+
+            Class<?> injectedType = field.getType();
+
+            Object value = getValue(ann, injectedType, field);
+
+            ReflectionUtils.makeAccessible(field);
+
+            field.set(target, value);
+        }
+    }
+
+    /**
+     * @Author: 天爱有情
+     * @Date: 2020/04/28 17:53
+     * @Description: 方法注入 比如 set方法
+     */
+    private class AnnotatedMethodElement extends InjectionMetadata.InjectedElement {
+        private final Method method;
+        private MergedAnnotation ann;
+        protected AnnotatedMethodElement(Method method, PropertyDescriptor pd, MergedAnnotation ann) {
+            super(method, pd);
+            this.method = method;
+            this.ann = ann;
+        }
+
+        @Override
+        protected void inject(Object bean, String beanName, PropertyValues pvs) throws Throwable {
+
+            Class<?> injectedType = pd.getPropertyType();
+
+            Object injectedObject = getValue(ann, injectedType, method);
+
+            ReflectionUtils.makeAccessible(method);
+
+            method.invoke(bean, injectedObject);
+        }
+
     }
 }

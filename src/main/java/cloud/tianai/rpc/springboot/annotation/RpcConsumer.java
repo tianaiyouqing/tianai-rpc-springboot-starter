@@ -1,14 +1,11 @@
 package cloud.tianai.rpc.springboot.annotation;
 
-
-import cloud.tianai.rpc.core.client.proxy.RpcProxyType;
-
 import java.lang.annotation.*;
 
 /**
  * @author Administrator
  */
-@Target({ElementType.FIELD})
+@Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RpcConsumer {
