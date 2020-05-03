@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema xmlns="http://rpc.tianai.cloud/schema/rpc"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:beans="http://www.springframework.org/schema/beans"
+            targetNamespace="http://rpc.tianai.cloud/schema/rpc"
+            elementFormDefault="qualified"
+            attributeFormDefault="unqualified">
+
+  <xsd:import namespace="http://www.w3.org/XML/1998/namespace"/>
+  <xsd:import namespace="http://www.springframework.org/schema/beans" schemaLocation="http://www.springframework.org/schema/beans/spring-beans.xsd"/>
+  <xsd:import namespace="http://www.springframework.org/schema/tool"/>
+
+  <xsd:element name="parameter">
+    <xsd:complexType>
+      <xsd:attribute name="key" type="xsd:string" use="required">
+        <xsd:annotation>
+          <xsd:documentation><![CDATA[ The parameter key. ]]></xsd:documentation>
+        </xsd:annotation>
+      </xsd:attribute>
+      <xsd:attribute name="value" type="xsd:string" use="required">
+        <xsd:annotation>
+          <xsd:documentation><![CDATA[ The parameter value. ]]></xsd:documentation>
+        </xsd:annotation>
+      </xsd:attribute>
+    </xsd:complexType>
+  </xsd:element>
+
+  <xsd:element name="provider">
+    <xsd:complexType>
+      <xsd:sequence  minOccurs="0" maxOccurs="unbounded">
+        <xsd:element ref="parameter"  minOccurs="0" maxOccurs="unbounded"/>
+      </xsd:sequence>
+      <xsd:attribute name="interface" use="required" type="xsd:string"/>
+      <xsd:attribute name="ref" use="required" type="xsd:string"/>
+      <xsd:attribute name="weight" type="xsd:string"/>
+    </xsd:complexType>
+  </xsd:element>
+  <xsd:element name="consumer">
+    <xsd:complexType>
+      <xsd:attribute name="id"  type="xsd:string"/>
+      <xsd:attribute name="interface" use="required" type="xsd:string"/>
+      <xsd:attribute name="proxy" type="xsd:string"/>
+      <xsd:attribute name="requestTimeout"  type="xsd:string"/>
+    </xsd:complexType>
+  </xsd:element>
+</xsd:schema>

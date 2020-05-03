@@ -1,10 +1,8 @@
 package cloud.tianai.rpc.springboot.autoconfiguration;
 
-import cloud.tianai.rpc.springboot.annotation.TianAiRpcAnnotationBean;
-import cloud.tianai.rpc.springboot.properties.RpcConsumerProperties;
+import cloud.tianai.rpc.springboot.annotation.AnnotationRpcProviderHandler;
+import cloud.tianai.rpc.springboot.annotation.TianAiRpcAnnotationPostProcessor;
 import cloud.tianai.rpc.springboot.properties.RpcProperties;
-import cloud.tianai.rpc.springboot.properties.RpcProviderProperties;
-import cloud.tianai.rpc.springboot.properties.RpcReqistryProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +20,14 @@ public class RpcAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public TianAiRpcAnnotationBean annotationBean(RpcProperties rpcProperties) {
-        return new TianAiRpcAnnotationBean(rpcProperties);
+    public AnnotationRpcProviderHandler rpcProviderHandler(RpcProperties rpcProperties) {
+        return new AnnotationRpcProviderHandler(rpcProperties, true);
+    }
+
+
+    @Bean
+    @ConditionalOnMissingBean
+    public TianAiRpcAnnotationPostProcessor annotationBean(RpcProperties rpcProperties, AnnotationRpcProviderHandler rpcProviderHandler) {
+        return new TianAiRpcAnnotationPostProcessor(rpcProperties, rpcProviderHandler);
     }
 }
